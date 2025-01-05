@@ -31,9 +31,8 @@ using namespace std;
  * @returns 0 if successful
  */
 int main(int argc, char **argv) {
-  constexpr size_t ALLOCS   = 1ULL << 26;
+  constexpr size_t ALLOCS   = 1ULL << 28;
   constexpr size_t SIZE     = 1ULL << 6;
-  constexpr size_t CAPACITY = 1ULL << 32;
   omp_set_num_threads(MAX_THREADS);
   // Allocate memory using malloc.
   {
@@ -70,9 +69,9 @@ int main(int argc, char **argv) {
   // Allocate memory using FixedArenaAllocator.
   {
     vector<void*> ptrs(ALLOCS);
-    vector<FixedArenaAllocator<SIZE, CAPACITY>*> mems(MAX_THREADS);
+    vector<FixedArenaAllocator<SIZE, ALLOCS>*> mems(MAX_THREADS);
     for (int i=0; i<MAX_THREADS; ++i)
-      mems[i] = new FixedArenaAllocator<SIZE, CAPACITY>(malloc(CAPACITY));
+      mems[i] = new FixedArenaAllocator<SIZE, ALLOCS>(malloc(ALLOCS * SIZE));
     float tm = measureDuration([&] {
       #pragma omp parallel for schedule(dynamic, 2048)
       for (size_t i=0; i<ALLOCS; ++i) {
@@ -92,10 +91,11 @@ int main(int argc, char **argv) {
   }
   // Allocate memory using ArenaAllocator (growing).
   {
+    constexpr size_t CAPACITY = 4096;
     vector<void*> ptrs(ALLOCS);
-    vector<ArenaAllocator<SIZE, 4096*SIZE>*> mems(MAX_THREADS);
+    vector<ArenaAllocator<SIZE, CAPACITY>*> mems(MAX_THREADS);
     for (int i=0; i<MAX_THREADS; ++i)
-      mems[i] = new ArenaAllocator<SIZE, 4096*SIZE>();
+      mems[i] = new ArenaAllocator<SIZE, CAPACITY>();
     float tm = measureDuration([&] {
       #pragma omp parallel for schedule(dynamic, 2048)
       for (size_t i=0; i<ALLOCS; ++i) {

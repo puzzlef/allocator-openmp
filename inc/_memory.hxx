@@ -28,7 +28,7 @@ using std::min;
 /**
  * A fixed-capacity Arena Allocator.
  * @tparam SIZE size of each allocation
- * @tparam CAPACITY size of the memory pool
+ * @tparam CAPACITY capacity of the memory pool
  */
 template <size_t SIZE, size_t CAPACITY>
 class FixedArenaAllocator {
@@ -37,7 +37,7 @@ class FixedArenaAllocator {
   /** Size of each allocation. */
   static constexpr size_t allocation_size = SIZE;
   /** Size of the memory pool. */
-  static constexpr size_t pool_size = CAPACITY;
+  static constexpr size_t pool_size = CAPACITY * SIZE;
   #pragma endregion
 
 
@@ -65,7 +65,7 @@ class FixedArenaAllocator {
       return ptr;
     }
     // Allocate from pool.
-    if (used < CAPACITY) {
+    if (used < pool_size) {
       void *ptr = (char*) pool + used;
       used += SIZE;
       return ptr;
@@ -101,16 +101,18 @@ class FixedArenaAllocator {
    */
   FixedArenaAllocator(void *pool)
   : pool(pool) {
-    freed.reserve(min(CAPACITY/SIZE, size_t(MIN_FREED)));
+    freed.reserve(min(CAPACITY, size_t(MIN_FREED)));
   }
   #pragma endregion
 };
 
 
+
+
 /**
  * A variable-capacity Arena Allocator.
  * @tparam SIZE size of each allocation
- * @tparam CAPACITY size of each memory pool
+ * @tparam CAPACITY capacity of each memory pool
  */
 template <size_t SIZE, size_t CAPACITY>
 class ArenaAllocator {
@@ -119,7 +121,7 @@ class ArenaAllocator {
   /** Size of each allocation. */
   static constexpr size_t allocation_size = SIZE;
   /** Size of each memory pool. */
-  static constexpr size_t pool_size = CAPACITY;
+  static constexpr size_t pool_size = CAPACITY * SIZE;
   #pragma endregion
 
 
@@ -127,7 +129,7 @@ class ArenaAllocator {
   /** These allocations have been freed, and can be reused. */
   vector<void*> freed {};
   /** Number of bytes used in the last memory pool. */
-  size_t used = CAPACITY;
+  size_t used = pool_size;
   /** Memory pools. */
   vector<void*> pools {};
   #pragma endregion
@@ -147,13 +149,13 @@ class ArenaAllocator {
       return ptr;
     }
     // Allocate from pool.
-    if (used < CAPACITY) {
+    if (used < pool_size) {
       void *ptr = (char*) pools.back() + used;
       used += SIZE;
       return ptr;
     }
     // Allocate a new pool.
-    void *pool = new char[CAPACITY];
+    void *pool = new char[pool_size];
     if (pool) {
       pools.push_back(pool);
       used = SIZE;
@@ -179,7 +181,7 @@ class ArenaAllocator {
     for (void *pool : pools)
       delete[] (char*) pool;
     pools.clear();
-    used = CAPACITY;
+    used = pool_size;
     freed.clear();
   }
   #pragma endregion
@@ -192,7 +194,7 @@ class ArenaAllocator {
    */
   ArenaAllocator() {
     pools.reserve(MIN_POOLS);
-    freed.reserve(min(CAPACITY/SIZE, size_t(MIN_FREED)));
+    freed.reserve(min(CAPACITY, size_t(MIN_FREED)));
   }
 
 
