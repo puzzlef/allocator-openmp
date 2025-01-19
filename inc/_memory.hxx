@@ -24,10 +24,6 @@ using std::min;
 #define MIN_POOLS 16
 /** Capacity of the power-of-two memory pool, in bytes. */
 #define POW2_POOL_SIZE 65536
-#ifndef MAX_THREADS
-/** Maximum number of threads expected. */
-#define MAX_THREADS 128
-#endif
 #pragma endregion
 
 
@@ -364,7 +360,7 @@ class ConcurrentPow2Allocator {
 
   #pragma region DATA
   protected:
-  Pow2Allocator<CAPACITY> a[MAX_THREADS];
+  vector<Pow2Allocator<CAPACITY>*> a;
   #pragma endregion
 
 
@@ -387,7 +383,7 @@ class ConcurrentPow2Allocator {
    */
   inline void* allocate(size_t n) {
     int t = omp_get_thread_num();
-    return a[t].allocate(n);
+    return a[t]->allocate(n);
   }
 
 
@@ -398,7 +394,7 @@ class ConcurrentPow2Allocator {
    */
   inline void deallocate(void *ptr, size_t n) {
     int t = omp_get_thread_num();
-    a[t].deallocate(ptr, n);
+    a[t]->deallocate(ptr, n);
   }
 
 
@@ -406,8 +402,9 @@ class ConcurrentPow2Allocator {
    * Free all memory.
    */
   inline void reset() noexcept {
-    for (int t=0; t<MAX_THREADS; ++t)
-      a[t].reset();
+    int T = a.size();
+    for (int t=0; t<T; ++t)
+      a[t]->reset();
   }
   #pragma endregion
 
@@ -417,13 +414,21 @@ class ConcurrentPow2Allocator {
   /**
    * Create a fast thread-safe power-of-two size allocator.
    */
-  ConcurrentPow2Allocator() = default;
+  ConcurrentPow2Allocator() {
+    int T = omp_get_max_threads();
+    a.resize(T);
+    for (int t=0; t<T; ++t)
+      a[t] = new Pow2Allocator<CAPACITY>();
+  }
 
   /**
    * Destroy the Concurrent Pow2 Allocator.
    */
   ~ConcurrentPow2Allocator() {
     reset();
+    int T = a.size();
+    for (int t=0; t<T; ++t)
+      delete a[t];
   }
   #pragma endregion
 };
