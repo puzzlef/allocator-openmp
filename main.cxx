@@ -189,6 +189,49 @@ int main(int argc, char **argv) {
     });
     printf("ArenaAllocator.allocate + deallocate: %.3f ms\n", ta);
   }
+  // Manage memory using ConcurrentPow2Allocator (growing).
+  {
+    constexpr size_t CAPACITY = 4096;
+    vector<void*> ptrs(ALLOCS);
+    ConcurrentPow2Allocator<SIZE*CAPACITY> mems;
+    float tm = measureDuration([&] {
+      #pragma omp parallel for schedule(dynamic, 2048)
+      for (size_t i=0; i<ALLOCS; ++i) {
+        // int t = omp_get_thread_num();
+        ptrs[i] = mems.allocate(SIZE);
+      }
+    });
+    printf("ConcurrentPow2Allocator.allocate: %.3f ms\n", tm);
+    float tf = measureDuration([&] {
+      #pragma omp parallel for schedule(dynamic, 2048)
+      for (size_t i=0; i<ALLOCS; ++i) {
+        // int t = omp_get_thread_num();
+        mems.deallocate(ptrs[i], SIZE);
+      }
+    });
+    printf("ConcurrentPow2Allocator.deallocate: %.3f ms\n", tf);
+  }
+  // Manage memory using ConcurrentPow2Allocator (growing, mixed).
+  {
+    constexpr size_t CAPACITY = 4096;
+    vector<void*> ptrs(ALLOCS/MIXED);
+    ConcurrentPow2Allocator<SIZE*CAPACITY> mems;
+    float ta = measureDuration([&] {
+      for (size_t l=0; l<MIXED; ++l) {
+        #pragma omp parallel for schedule(dynamic, 2048)
+        for (size_t i=0; i<ALLOCS/MIXED; ++i) {
+          // int t = omp_get_thread_num();
+          ptrs[i] = mems.allocate(SIZE);
+        }
+        #pragma omp parallel for schedule(dynamic, 2048)
+        for (size_t i=0; i<ALLOCS/MIXED; ++i) {
+          // int t = omp_get_thread_num();
+          mems.deallocate(ptrs[i], SIZE);
+        }
+      }
+    });
+    printf("ConcurrentPow2Allocator.allocate + deallocate: %.3f ms\n", ta);
+  }
   printf("Performed %zu allocations of %zu bytes each.\n", ALLOCS, SIZE);
   printf("\n");
 }
